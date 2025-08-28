@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - Part 1</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Aug 28, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Kernel Structure:</h2>
+          <div  style="white-space: pre-line;">
+          Running the kernel has always been a daunting task for me, last time i gave it a try back in 2022, i was able to complie and run it by following some article, but still i really didnt understand what excatly happened during the runtime, all those big commands i ran, i had no idea what they did. Today, let's start from the basics to understand the entire process fully.
+
+          the bootloader is another gaint that we are gonna assume (this is another big topic to learn.) that it will do its job of loading things into memeory and jump into the kernel starting address (this will be a binary).
+
+          now our big blob of data (kernel) is loaded into memory and it is gonna sit there untill we kill the os, kernel doesnt do much on its own, as it is just an interface between the userspace and the hardware, even in this point, where the kernel is loaded, we have already done everyting kernel needs, however an user needs to use this kernel and do some usefull things, we have the command line, which is just an shell language with file system to store stuff, network interfaces to connect.
+
+          So our kernel takes an initial binary that it will run, it can do anything we ask it to
+
+          eg: if we just ask it to echo 'Hello world', it will echo it, kernel will be done
+
+          <pre><code>
+            #!/bin/sh 
+            echo "hello world!"
+          </code>
+          </pre>
+
+          store this into a file called init, if you ask the kernel to run this as the initial binary (i will explain how we can make the kernel run this init), it will print hello world and exit, nothing much
+
+          but we want to get a full functional shell and final system, lets write another bash that will spawn a shell
+
+          <pre><code>
+            #!/bin/sh
+            echo "exec into shell";
+            exec /bin/sh
+          </code></pre>
+
+          this will give us a shell, that we can work with, and that is all we need to do to start a kernel and get a functional shell
+
+          bootloader -> kernel init binary -> shell (simplified flow path)
+
+          now we have to think what excatly do i mean by pointing the kernel to run the inital binary, sounds like a mystry.
+
+          lets understand what is a filesystem first, it is just a physical storage, that we can read/write to, but there is RAM, where the kernel will be loaded, it is volatile memory, then we have the physical storage devices, here everything we do is persistant. the kernel needs to know where is the filesystem address is, 
+
+          now we have two options, we can pass as volitale filesystem inside the RAM or we can pass an actually physical filesystem.
+
+
+          # RAM based
+          
+          here the bootloader will load a small volitale filesystem (it is usually called as initramfs) and load into the RAM, pass that physical address to kernel
+
+          let's create a simple initramfs
+
+          - a filesystem has a structure, starting from the root i.e /, we have sbin, bin, dev, proc etc. so let's create those dirs
+
+          <pre><code>
+            mkdir -p initramfs/{bin,sbin,sys,proc,dev,lib/modules,lib64,mnt,etc}
+          </code></pre>
+
+          - filesystem structure is ready, now need to put the needed binaries that we are gonna use eg: sh, ls, cd, mount, mod_probe. we can keep this minimal and small, as this fs is only for temporary purpose
+
+          - we can download all binaries are copy them inside the respective dirs, however there is binray called busybox that is specifically designed for this purpose, it can act as all main binaries, so we can just symlink them with different names
+
+          <pre><code>
+            wget https://raw.githubusercontent.com/xerta555/Busybox-Binaries/refs/heads/master/busybox-arm64
+            mv busybox-arm64 busybox
+            ln -s busybox initramfs/bin/sh
+            ln -s busybox initramfs/bin/ls
+            ln -s busybox initramfs/bin/cd 
+          </code></pre>
+
+          - now we have the filesystem structure, needed binaries, let put the init file in the top root, we can have any content in this, but usually, this script will start some drivers and change root into the actual physical fs
+
+          <pre><code>
+            #!/bin/sh
+
+            echo "[INITRAMFS] Init called, gonna load stuff";
+
+
+            mount -t proc none /proc
+            mount -t sysfs none /sys
+            mount -t devtmpfs none /dev
+
+            echo "[INITRAMFS] Load kernel modules"
+
+            mount virtio_blk
+            mount ext4
+
+            echo "[INITRAMFS] Sleeping till all devices are ready"
+            sleep 3
+            echo "[INITRAMFS] Listing /dev/v*"
+            ls /dev/v*
+
+            mount -t ext4 /dev/vda /mnt || {
+                echo "[INITRAMFS] Failed to mount /dev/vda /mnt"
+            }
+
+            ls -lah /mnt/sbin/
+            cd /mnt
+            echo "[INITRAMFS] Switch to actual root system"
+            exec switch_root . "/sbin/init" "$@"
+
+          </code></pre>
+
+          in this code, i am mounting empty values into kernel specific dirs, probe kernel modules and mount the actual file system and switch_root in the root file system
+
+          here the key step is to mod_probe root fs related kernel modules
+
+          - dir structure is ready, now we need to pack this whole dir into cpio format, as the kernel only accepts this format
+
+          <pre><code>
+            chmod +x initramfs/init 
+            cd initramfs/
+            find . | cpio -o --format=newc | gzip > ../initramfs.cpio.gz
+          </code></pre>
+
+          # Actual Physical Filesystem
+
+          here the bootloader will directly pass the device to the kernel, eg: /dev/sd1, this sd1 will be memory mapped to the actual device.
+
+          now that the kernel knows where the filesystem lies (based on one of the above two options), it will go find the init binary inside every dir in that filesystem and run it.
+
+          let's create a simple rootfs
+
+          - there isnt much difference in the process compared to initramfs, there we created the dir sturcture, placed all binaries and init, packed the dir into cpio. for rootfs, we create an image (ext4 format in my case) 
+
+          <pre><code>
+            dd if=/dev/zero of=rootfs.img bs=1M count=2048
+            mkfs.ext4 rootfs.img
+          </code></pre>
+
+          - above command creates an file with 1mb blocks with 2048 total count, 2048mb in total, then we can use mkfs command to convert the file in to image, now can mount this img file and add the binaries and init, we can download all needed binaries from debian.
+
+          <pre><code>
+            mkdir -p mnt
+            mount rootfs.img mnt
+            debootstrap --arch=arm64 --variant=minbase bookworm root_dir http://deb.debian.org/debian
+            cp -a root_dir/* mnt/
+            umount mnt
+          </code></pre>
+
+          now we can compile the kernel, with default config and get the kernel image
+
+          kernel image + initramfs + rootfs = we have everything to start the kernel using qemu
+
+
+          <pre><code>
+            qemu-system-aarch64 \
+            -machine virt \
+            -cpu cortex-a72 \
+            -nographic \
+            -m 2048 \
+            -kernel linux/Image \
+            -initrd initramfs.cpio.gz \
+            -drive file=rootfs.img,format=raw,if=virtio \
+            -append "root=/dev/vda console=ttyAMA0" \
+            -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+            -device virtio-net-device,netdev=net0
+          </code></pre>
+          
+        </div>
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
