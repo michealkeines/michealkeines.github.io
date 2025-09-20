@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - Interrupts</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - Interrupts</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Sep 20, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">15 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see a why we need Interrupts...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-boot-loader.html">previous blog</a> we wrote a simple bootloader that dropped us into a barebone kernel.
+
+            we jumped straight from Reset into EL1 and ran Kernel Main.
+
+            our kernel only printed a message and exited, we shouldn't be calling that a kernel, it was just a program, A kernel is the heart of the OS, it needs to be able to run multiple things at a time, it should be able to connect with other physical components.
+
+            what does it mean to run multiple things?
+
+            on a single core CPU, our kernel needs to run multiple things, common way is time sharing, just give each process a limited amount of time to do some work and remove them, this way everyone gets to finish bit of what they wanted to do.
+
+            but, how? how does the CPU know the differenc between the kernel and the process?
+
+            this is where Exception Levels (EL), come into play, as we saw in previous blog, we jump into EL1, this is what we call the kernel, anything that is running here, it is basically the kernel.
+
+            EL0 is the User Mode, normal processes run there.
+
+            so our Single Core CPU is mostly running on EL0, then when an interrupt occurs, the CPU will be switched back to EL1, at this point the kernel has decide, "Should i keep running this process, or switch to another one?"
+
+
+            what does it mean to connect to physical components?
+
+            let say we have Network Card, it is an external device that will be connected to the main CPU, so if our kernel is running, it needs to know what is going on in the Network Card and if Network cards has something to say, it should be able to talk to kernel
+
+
+
+            In both cases (Time Sharing, external Connection), the key is to stop the process (EL0), Switch to EL1, decide what to run next.
+
+            
+
+            I used to think that kernel is the main loop that runs processess and kernel is always running, that picture got destroyed after i learned about the EL0, EL1 separation and there only one CPU loop.
+
+            i believe now you have the picture of what is the actual main loop that is always running and how EL1 controls EL0, and they both run on the same main loop (CPU).
+
+            CPU → EL0 → interrupt → EL1 → decision → back to EL0.
+
+            Incase, if we didnt have interrupts, CPU will have to poll/busy-wait on process/devices, which would be really bad for performance
+
+            there is another issue, we have one CPU, what if multiple devices want to interrupt? who will decide that you can disturb the CPU now?
+
+            we have a separate device that handles this called as GIC, and all the devices are connected to this and GIC makes the actual interrupt to CPU (one interrupt at a time)
+
+            GIC asks the following question before deciding what to do:
+
+            - Which device is most important right now? (priority)
+
+            - Should we even disturb the CPU at all? (masking)
+
+            - Which CPU core should get this? (incase of multiple CPU cores)
+
+            
+            so if a network packet + mouse event + printer event all comes to GIC, only the important event is sent as interrupt to CPU
+
+            Without the GIC, the kernel would be just overwhelmed and would waste a lot of time in switching between ELs
+
+            now that we have enough information, lets write an example kernel, that will just wait in busy loop in EL0 ie, our user level program is just an empty while loop
+
+            initialize timer iterrupts, so periodically our empty while loop will stop, we switch back to EL1, log a message, get back to EL0
+
+            this will excatly demostrate what we just learned.
+
+
+
+            <a href="/patches/kernel-interrupts.patch.txt">Entire Diff</a>
+
+
+            Run the code:
+
+            <video width="640" height="360" controls>
+                <source src="/records/kernel-interrupts.mov" type="video/quicktime">
+                <p>Your browser does not support the video tag. 
+                   <a href="/records/kernel-interrupts.mov">Download the video</a>.</p>
+              </video>
+              
+
+
+
+
+
+          </div>
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>

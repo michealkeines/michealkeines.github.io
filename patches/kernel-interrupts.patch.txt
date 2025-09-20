@@ -1,0 +1,427 @@
+diff --color -ruN emtpy/arch/aarch64/start.s kernel-interrupts/arch/aarch64/start.s
+--- emtpy/arch/aarch64/start.s	1970-01-01 01:00:00
++++ kernel-interrupts/arch/aarch64/start.s	2025-09-20 11:59:06
+@@ -0,0 +1,33 @@
++.section .text, "ax"
++.globl _start
++.extern kmain
++.extern __bss_start
++.extern __bss_end
++.extern vectors
++
++_start:
++    // Mask all D, A, I, F, so we dont have any interrupts at this stage
++    msr DAIFSet, #0xf
++
++    // switch betweein el1,0 with proper sp
++    //msr SPSel, #1
++
++    // init SP for C runtime
++    ldr x0, =_stack_top
++    mov sp, x0
++
++    // Zero .bss
++    ldr  x1, =__bss_start
++    ldr  x2, =__bss_end
++1:  cmp  x1, x2
++    b.eq 2f
++    str  xzr, [x1], #8
++    b    1b
++
++    // set vector base address for EL1
++2:  ldr     x0, =vectors
++    msr     VBAR_EL1, x0
++    isb
++
++    bl      kmain
++    b       .
+\ No newline at end of file
+diff --color -ruN emtpy/arch/aarch64/vectors.s kernel-interrupts/arch/aarch64/vectors.s
+--- emtpy/arch/aarch64/vectors.s	1970-01-01 01:00:00
++++ kernel-interrupts/arch/aarch64/vectors.s	2025-09-20 11:55:26
+@@ -0,0 +1,42 @@
++.macro VEC handler
++    b \handler
++    .space 128-4
++.endm
++
++.section .text, "ax"
++.align   11
++.globl   vectors
++
++.extern  el1_sync
++.extern  el1_irq
++.extern  el0_sync
++
++// we need to have all the 16 exceptions handled
++// Exceptions are handler using the Base vector + vector index
++// 4 slots defines, where the interrupt is comming from
++
++vectors:
++    // EL1t
++    VEC el1_sync
++    VEC el1_irq
++    VEC .
++    VEC .
++
++    // EL1h
++    VEC el1_sync
++    VEC el1_irq
++    VEC .
++    VEC .
++
++    // EL0 32-bit
++    VEC el0_sync
++    VEC el1_irq
++    VEC .
++    VEC .
++
++    // EL0 64-bit
++    VEC el0_sync
++    VEC el1_irq
++    VEC .
++    VEC .
++
+diff --color -ruN emtpy/build kernel-interrupts/build
+--- emtpy/build	1970-01-01 01:00:00
++++ kernel-interrupts/build	2025-09-20 12:01:58
+@@ -0,0 +1,9 @@
++clang --target=aarch64-none-elf -c arch/aarch64/start.s -o start.o
++clang --target=aarch64-none-elf -c arch/aarch64/vectors.s -o vectors.o
++clang --target=aarch64-none-elf -c user/busy.s -o busy.o
++clang --target=aarch64-none-elf -O2 -ffreestanding -nostdlib -c drivers/char/uart.c drivers/irq/gicv2.c core/timer.c core/handlers.c core/kmain.c
++
++/opt/homebrew/opt/llvm@16/bin/ld.lld -T linker.ld -nostdlib -z max-page-size=4096 -o kernel.elf start.o vectors.o uart.o gicv2.o timer.o handlers.o kmain.o busy.o
++
++qemu-system-aarch64 -M virt -cpu cortex-a53 -m 256M -nographic -serial mon:stdio -kernel kernel.elf -d guest_errors,int -accel hvf
++
+Binary files emtpy/busy.o and kernel-interrupts/busy.o differ
+diff --color -ruN emtpy/core/handlers.c kernel-interrupts/core/handlers.c
+--- emtpy/core/handlers.c	1970-01-01 01:00:00
++++ kernel-interrupts/core/handlers.c	2025-09-20 11:55:15
+@@ -0,0 +1,13 @@
++#include <stdint.h>
++
++extern void uart_puts(const char*);
++
++void el1_sync(void)
++{
++    uart_puts("EL1 sync\n");
++}
++
++void el0_sync(void)
++{
++    uart_puts("EL0 sync\n");
++}
+\ No newline at end of file
+diff --color -ruN emtpy/core/kmain.c kernel-interrupts/core/kmain.c
+--- emtpy/core/kmain.c	1970-01-01 01:00:00
++++ kernel-interrupts/core/kmain.c	2025-09-20 12:01:19
+@@ -0,0 +1,59 @@
++
++#include <stdint.h>
++
++extern void uart_puts(const char *);
++extern void gic_init(void);
++extern void timer_init_1khz(void);
++extern void user_loop(void);
++extern void uart_init(void);
++
++/*
++    ELR_EL1 = location of the function to run after jumping into EL0
++
++    SPSR_EL1 = what are masks and privilages
++
++    SP_EL0 = stack location
++
++    ERET = jump into a ELR_EL1 location and execute
++
++    PC ← ELR_EL1
++    PSTATE ← SPSR_EL1
++    Switches to the new exception level
++    Switches the stack pointer to SP_EL0
++*/
++static void enter_el0(void (*fn)(void))
++{
++    // pick a location for EL0 stack starting, and store it ot sp of EL0
++    register uint64_t sp0 asm("x0") = (uint64_t) 0x40020000;
++    asm volatile("msr SP_EL0, %0"::"r"(sp0));
++
++    // SPSR_EL1, set it with all zeroed, set the function and finally call eret
++    uint64_t spsr = 0;
++    asm volatile("msr SPSR_EL1, %0"::"r"(spsr));
++    asm volatile("msr ELR_EL1, %0"::"r"(fn));
++    uart_puts("EL1: all set now -> (EL0)\n");
++
++    asm volatile("eret");
++}
++
++void kmain(void)
++{
++    uart_init(); // init uart
++    uart_puts("\r\nEL1: Kernel Starting\n");
++
++    // start gic
++    gic_init();
++
++    // start timer
++    timer_init_1khz();
++
++    uart_puts("EL1: enable irq\n");
++
++    asm volatile("msr DAIFClr, #2");
++
++    uart_puts("EL1: jump into user function (EL0)\n");
++
++    enter_el0(user_loop);
++
++    while (1) { asm volatile("wfi"); }
++}
+\ No newline at end of file
+diff --color -ruN emtpy/core/timer.c kernel-interrupts/core/timer.c
+--- emtpy/core/timer.c	1970-01-01 01:00:00
++++ kernel-interrupts/core/timer.c	2025-09-20 11:58:46
+@@ -0,0 +1,74 @@
++#include <stdint.h>
++
++extern void uart_puts(const char*);
++extern void gic_eoi(unsigned int);
++extern unsigned int gic_ack(void);
++
++volatile unsigned long jiffies; // our internal counter
++static unsigned long cntfrq; // current frequency
++
++// this will use to set the frequency,
++// eg: interrupt me every 1ms
++static inline void msr_cntv_tval(uint64_t v)
++{
++    asm volatile(
++        "msr CNTV_TVAL_EL0, %0"::"r"(v)
++    );
++}
++
++// Enable Timer interrupts, it has its own arch specific register
++static inline void enable_cntv(void)
++{
++    asm volatile(
++        "msr CNTV_CTL_EL0, %0"::"r"(1ull)
++    );
++}
++
++// Read the actual frequency of the CPU,
++// we use this to set our internal interrupt timing
++static inline void read_cntfrq(void)
++{
++    asm volatile(
++        "mrs %0, CNTFRQ_EL0":"=r"(cntfrq)
++    );
++}
++
++static inline void set_cntv(void)
++{
++    uint64_t our_freq = cntfrq / 1000; // we want the interrupt every 1ms
++    msr_cntv_tval(our_freq);
++}
++
++void timer_init_1khz(void)
++{
++    read_cntfrq(); // read curren freq
++    set_cntv();
++    enable_cntv(); // enable timer interrupts
++}
++
++
++void timer_irq_handler(void)
++{
++    jiffies++; // if we are here, we need to increament our internal counter, because we got an interrupt request
++
++    // now we can log it, lets log it after every 1000 jiffies
++    if ((jiffies % 1000ul) == 0)
++    {
++        uart_puts("Done one Tick, we are in EL1\n");
++    }
++
++    set_cntv(); // set it back again, so it will interrupt us back in 1ms
++
++}
++
++
++// EL1 irq handler
++void el1_irq(void)
++{
++    // uart_puts("EL1: irq handler (started))\n");
++    unsigned int iar = gic_ack(); // we get the current interrupt
++    unsigned int id = iar & 0x3FF;
++
++    if (id == 27) timer_irq_handler(); // if it is timmer, we call the handler
++    gic_eoi(iar); // we say that we are done now
++}
+\ No newline at end of file
+diff --color -ruN emtpy/drivers/char/uart.c kernel-interrupts/drivers/char/uart.c
+--- emtpy/drivers/char/uart.c	1970-01-01 01:00:00
++++ kernel-interrupts/drivers/char/uart.c	2025-09-20 12:00:06
+@@ -0,0 +1,69 @@
++/*
++UART is just a common way to connect and send bit based on time difference (baudrate)
++
++both parties will agree on a frame and baudrate
++
++*/
++
++#include <stdint.h>
++
++#define UART    0x09000000UL  // Base Address
++#define DR      (UART + 0x00) // Data register
++#define FR      (UART + 0x18) // Status Flag
++#define IBRD    (UART + 0x24)
++#define FBRD    (UART + 0x28)
++#define LCRH    (UART + 0x2C)
++#define CR      (UART + 0x30)
++#define IMSC    (UART + 0x38)
++#define ICR     (UART + 0x44)
++
++static inline void mmio_w32(uint64_t addr, uint32_t v){ *(volatile uint32_t*)addr = v; }
++static inline uint32_t mmio_r32(uint64_t addr){ return *(volatile uint32_t*)addr; }
++
++void uart_init(void)
++{
++    // 1) Disable UART while configuring
++    mmio_w32(CR, 0);
++
++    // 2) Clear pending interrupts
++    mmio_w32(ICR, 0x7FF);
++
++    // 3) Baud ~115200 with 24 MHz refclk (QEMU virt default)
++    //    Divisor = 24_000_000 / (16 * 115200) = 13.0208 → IBRD=13, FBRD≈2
++    mmio_w32(IBRD, 13);
++    mmio_w32(FBRD, 2);
++
++    // 4) 8N1, FIFO enabled: WLEN=0b11 (bits 6:5), FEN=1 (bit 4)
++    mmio_w32(LCRH, (3u << 5) | (1u << 4));
++
++    // 5) Mask all UART interrupts (polling mode for now)
++    mmio_w32(IMSC, 0);
++
++    // 6) Enable UART, TX, RX: UARTEN(bit0), TXE(bit8), RXE(bit9)
++    mmio_w32(CR, (1u << 0) | (1u << 8) | (1u << 9));
++
++    (void)mmio_r32(FR);
++}
++
++
++static inline void write_data(uint32_t value)
++{
++    *(volatile uint32_t*)DR = value;
++}
++
++static inline uint32_t read_status()
++{
++    return *(volatile uint32_t*)FR;
++}
++
++void uart_putc(char c)
++{
++    while (read_status() & (1<<5)) {} // wait for the status flag and the proceed to writing
++
++    write_data((uint32_t)c);
++}
++
++void uart_puts(const char* s)
++{
++    while(*s) uart_putc(*s++);
++}
+\ No newline at end of file
+diff --color -ruN emtpy/drivers/irq/gicv2.c kernel-interrupts/drivers/irq/gicv2.c
+--- emtpy/drivers/irq/gicv2.c	1970-01-01 01:00:00
++++ kernel-interrupts/drivers/irq/gicv2.c	2025-09-20 12:00:23
+@@ -0,0 +1,49 @@
++#include <stdint.h>
++
++#define GICD_BASE 0x08000000UL // this is where every device will register their interrupts
++
++#define GICC_BASE 0x08010000UL // this where the CPU will receive its one request from GIC
++
++
++static inline void w32(uint64_t a, uint32_t v)
++{
++    *(volatile uint32_t*)a = v;
++}
++
++static inline uint32_t r32(uint64_t a)
++{
++    return *(volatile uint32_t*)a;
++}
++
++#define IRQ_VTIMER 27
++
++void gic_init(void)
++{
++    w32(GICD_BASE + 0x000, 1); // Enable GIC, so other devices can register their interrupts
++
++    // enable vtimer, this is per-cpu irq, PPI27, so we need to write to ISENABLER0 (0x100)
++    // this way our GIC will only listen for this interrupt, every other interrupt will be ignored by GIC
++    w32(GICD_BASE + 0x100, (1u<<IRQ_VTIMER));
++
++
++    // Enable CPU to listen for interrupts from GIC
++    w32(GICC_BASE + 0x000, 1);
++
++
++    // CPU will only process interrupts, if its priority level is atleast 0xf0, its like saying only give me interrupts that are critical
++    w32(GICC_BASE + 0x004, 0xf0);
++}
++
++// Interrupt handler will use this to get the ID of the current interrupt
++unsigned int gic_ack(void)
++{
++    // reading from register 0x00C, that is Interrupt Acknowledge Register, IAR
++    return r32(GICC_BASE + 0x00C);
++}
++
++// Interrupt handler will call this after done with the request handling
++void gic_eoi(unsigned int irq)
++{
++    // writing to register 0x010 to notify we are done, End of Interrupt Register, EOIR
++    w32(GICC_BASE + 0x010, irq);
++}
+\ No newline at end of file
+Binary files emtpy/gicv2.o and kernel-interrupts/gicv2.o differ
+Binary files emtpy/handlers.o and kernel-interrupts/handlers.o differ
+Binary files emtpy/kernel.elf and kernel-interrupts/kernel.elf differ
+Binary files emtpy/kmain.o and kernel-interrupts/kmain.o differ
+diff --color -ruN emtpy/linker.ld kernel-interrupts/linker.ld
+--- emtpy/linker.ld	1970-01-01 01:00:00
++++ kernel-interrupts/linker.ld	2025-09-20 10:55:17
+@@ -0,0 +1,13 @@
++ENTRY(_start)
++SECTIONS
++{
++    . = 0x40000000;
++    .text : { *(.text*) }
++    .rodata : { *(.rodata*) }
++    .data : { *(.data*) }
++    .bss : {
++        __bss_start = .;
++        *(.bss*) *(COMMON) __bss_end = .;
++    }
++    _stack_top = 0x40010000;
++}
+\ No newline at end of file
+Binary files emtpy/start.o and kernel-interrupts/start.o differ
+Binary files emtpy/timer.o and kernel-interrupts/timer.o differ
+Binary files emtpy/uart.o and kernel-interrupts/uart.o differ
+diff --color -ruN emtpy/user/busy.s kernel-interrupts/user/busy.s
+--- emtpy/user/busy.s	1970-01-01 01:00:00
++++ kernel-interrupts/user/busy.s	2025-09-20 09:58:20
+@@ -0,0 +1,10 @@
++.section .text, "ax"
++.globl user_loop
++
++user_loop:
++// we excepting the kernel to interrupt and switch back here after the interrupt handling
++1:
++    mov x0, #1 // just move something in a register
++    mov x0, #2 // just move something in a register
++    b 1b // keep repeating this move
++
+Binary files emtpy/vectors.o and kernel-interrupts/vectors.o differ
