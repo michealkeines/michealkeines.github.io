@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - Simple Schedular</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - Simple Schedular</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Sep 28, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">15 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see a how a simple schedular works...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-interrupts.html">previous blog</a> we learned why we need interrupts and implemented a simple interrupt setup.
+
+            A simple user application was interrupted by our timer and a log was printed, here there is a single user program, in real world a kernel would have to support multiple user programs.
+
+            without any rules, the first program to get the CPU will never leave, our timer interrupt can force the pauses, but when this happens "someone" has to decide who gets the CPU next
+
+            That "someone" is the scheduler in our case.
+
+            scheduler has to decide based on certain cases
+
+            - should we switch the current program? 
+            - if we always pick the same program, others have to wait forever
+            - if we switch to often, we waste time on switching between programs, so allocate time slices, we dont switch oten
+            - should everyone get the same number of CPU cycles or should someone get more as they are considered "more important"?
+            - what do we remember about the program? eg: registers, pc, stacks etc
+
+
+
+            in general, a simple structure for this scheduler would be
+
+            - keep all list of all user programs
+            - on every timer interrupt, check the current program's number of cycles used, if it more than the limit, check the programs that are in ready state and pick one from them, else let the current program run.
+            - if we decide to switch, save the old program's context, load the new one context, and jump back to EL0
+
+
+            incase if youre wondering, what is a context, a normal CPU doest really care about anything, it fetches a instruction, executes it and moves to next instruction, so during excution of a such program (bunch of instruction), if we want to stop it and run later, all we have to do is, save the location of the next instruction that needs to executed (program counter) and all other general registers.
+
+            so in our design we can put this into a data structure to represent it as a program, it should have all the needed information to switch between programs
+
+            - what is the program current context? everything is needed to start running it
+
+              -- registers 
+              -- program counter (where we left off)
+              -- stack pointer (top of the stack)
+              -- kernel stack pointer (top of the stack, inside kernel)
+              -- time_slice (number of cycles we are used so far)
+
+            - what is the current state of the program? READY, RUNNING, BLOCKED - this need to be stored
+  
+              <pre><code>
+                struct Context {
+                    uint64_t x[31];
+                    uint64_t sp_el0;
+                    uint64_t elr_el1;
+                    uint64_t spsr_el1;
+                };
+
+                struct Task {
+                    int id;
+                    enum state { READY, RUNNING, BLOCKED } state;
+                    struct Context *context;
+                    void *user_stack;
+                    void *kernel_stack;
+                    struct Task* next;
+                };
+              </code>
+              </pre>
+
+            
+            now that we have a structure to hold the program, lets think about the code that will decide who goes next
+
+            for learning purpose, let's use Round-Robin Scheduling, it is a well known, simple scheduling algorithm
+
+
+            when the timer interrupt arrives, 
+
+            1. Pause the current program (lets asssume that the time slice is over)
+              - save the registers, pc, pointers
+              - change the state from running -> ready
+              - put it back at the end of ready queue
+            2. Pick the next program
+              - pop the task at the front of the read queue
+              - change the state from ready -> running
+            3. Restore its conext
+              - load the registers, pc, pointers
+              - jump to EL0
+
+            currently we dont have to think about fairness and just pick the next program that is in ready queue
+
+            i.e: if A,B,C are the programs, switch happens after the time slice is used up
+
+            A → B → C → A → B → C → A → …
+
+
+            <a href="https://github.com/michealkeines/kernel_fuzzing/tree/main/kernel-simple-scheduler">Entire Diff</a>
+
+
+            Run the code:
+
+            <video width="640" height="360" controls>
+                <source src="/records/simple-scheduler.mov" type="video/quicktime">
+                <p>Your browser does not support the video tag. 
+                   <a href="/records/simple-scheduler.mov">Download the video</a>.</p>
+              </video>
+              
+
+
+          </div>
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
