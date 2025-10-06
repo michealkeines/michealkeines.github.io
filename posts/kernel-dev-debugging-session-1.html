@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - Debugging Kernel - Part 1</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - Debugging Kernel - Part 1</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Oct 06, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see some common issues...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-simple-scheduler.html">previous blog</a> we wrote a simple Scheduler that switched between two user processes.
+
+            This week i started off with the next part which is MMU, as separating memory between processess is a crucial secuity feature, before that, we need some good base line to start with, we need some tools to debug issues, as our code grows, it will be hard to keep everything in our mind canvas.
+
+            I personally need a good printf helper to debug the old fashioned way, its quick, if you know where to find the issue and is almost always good enough for high level logic debugging.
+
+            I have written a <a href="https://github.com/michealkeines/kernel_fuzzing/blob/12ce955c6667b2ddf90e1721d3fdb81697c66b2b/kernel-simple-mmu/drivers/char/uart.c#L108" class="">print helper</a> that supports %d, %s, %c format specifiers, this should be enough, maybe we can add %x helper in future.
+
+            But, for our kernel, there is just so many external devices involved, and they like to enabled and used in a certain way and it is impossible to confirm, if we have passed everything properly to the device in question, without a debugger, this is where GDB is gonna help us, it is really good, and i only know few commands, still i havent felt the need to learn any new commads there.
+
+            Let's start with some examples cases and how to debug them.
+
+            CASE 1:
+
+            When my simple scheduler kernel was running, it is supposed to switch between the two Task, but initially, when i ran the code, i kept getting log messages from Task1, it is obvious that the task is not getting switched, but we need to confirm that, because it is possible that something else is messed up to. so i started by adding a print statement right after the dequeue to what was the next Task that is getting scheduled <a href="https://github.com/michealkeines/kernel_fuzzing/blob/12ce955c6667b2ddf90e1721d3fdb81697c66b2b/kernel-simple-mmu/core/sched.c#L62" class="">here</a>, this confirmed that the next Task was also A. From there i added bunch of prints in the entire file to figure that the Head was set to 0, after adding a new task to the end, you can find all the prints inside the <a href="https://github.com/michealkeines/kernel_fuzzing/blob/12ce955c6667b2ddf90e1721d3fdb81697c66b2b/kernel-simple-mmu/core/sched.c" class="">file</a>
+            
+            CASE 2:
+
+            well, the print method might seem easy, but it took an entire day for me to figure it that way, with GDB, i believe it could have been better, still GDB is not really for finding bugs in logic, because that previous example is just me writing dumb linked-list code, GDB shines, when you need to comply with certian rules, like parameter passing, checking if we have the struct aligned in memory as we excepted, and the key is, adding extra print will ruin the existing layout and even if you figure out a fix with print, after you remove it, it may not work, because you just should changed the entire memory layout by removing a function call.
+
+            I wrote a syscall, write, which can be used from user process, but no matter what i do, i was not able to get the current parameters in the irq_sync_handler in correct order.
+
+            I was able to confirm that i am passing the variable correctly in the <a href="https://github.com/michealkeines/kernel_fuzzing/blob/12ce955c6667b2ddf90e1721d3fdb81697c66b2b/kernel-simple-mmu/user/user.c#L6" class="">syscall file</a>
+
+            but within the <a href="https://github.com/michealkeines/kernel_fuzzing/blob/12ce955c6667b2ddf90e1721d3fdb81697c66b2b/kernel-simple-mmu/core/handlers.c#L45" class="">dispatcher code</a>, the arguments are messed up.
+
+            i stopped my pointless printfs and attached the process to gdb, tried to add a break statement at the function, well, here is another issue, i dont see the function at all, even worse, if i add a print statment and attach it to gdb, i see the function, if i remove the print and attach it to gdb, boom, the function is no longer there.
+
+            this was new for me, turns out my normal high level language brain which dont care about compiler optimizations, forgot to consider that compiler can decide that certain function could be inlined and lot of things could be cached to make things fast.
+
+            this is exactly what happened in my case
+            <pre>
+            <code class="">
+                → 0x40001968 <syscall_dispatcher+0004> adrp x0, 0x40001000 <el1_sync_entry> 
+                0x4000196c <syscall_dispatcher+0008> add x0, x0, #0x9b4 
+                0x40001970 <syscall_dispatcher+000c> mov x29, sp 
+                0x40001974 <syscall_dispatcher+0010> bl 0x400012b4 <uart_printf> 
+                0x40001978 .inst 0x73550042 ; undefined 0x4000197c .inst 0x4c207265 ; undefined ─────────────────────────────────────────────────────────────────── threads ──── [#0] Id 1, stopped 0x40001968 in syscall_dispatcher (), reason: BREAKPOINT ───────────────────────────────────────────────────────────────────── trace ──── [#0] 0x40001968 → syscall_dispatcher() [#1] 0x400010e0 → el0_sync_entry() ──────────────────────────────────────────────────────────────────────────────── (remote) gef➤ info registers 
+                x0 0x1 0x1 
+                x1 0x40001a20 0x40001a20 
+                x2 0xa 0xa 
+                x3 0x0 0x0 
+                x4 0x0 0x0 
+                x5 0x0 0x0 
+                x6 0x0 0x0 
+                x7 0x0 0x0 
+                x8 0x1 0x1 
+                x9 0x9000018 0x9000018 
+                0x40001968 <syscall_dispatcher+0004> adrp x0, 0x40001000 <el1_sync_entry> 
+                0x4000196c <syscall_dispatcher+0008> add x0, x0, #0x9b4 
+                0x40001970 <syscall_dispatcher+000c> mov x29, sp 
+                0x40001974 <syscall_dispatcher+0010> bl 0x400012b4 <uart_printf>
+            </code>
+        </pre>
+
+        break before the dispatcher code showed that my arguments are in correct register x0, x1, x2, but the syscall dispatcher starts with prolog stub that alters the registers and also changes the sp structure.
+
+        To get around this issues, i had to write a helper that just has asm and set it with naked attribute and internal call to the actually method with proper arguments.
+
+        this solved the issue and everything works now, but there is a bigger issues somewhere which i havent figured is that if i remove `-O2` from my compiler flags, everything breaks again, this will be exericise for you guys if you want to try and find which structure is broke, or maybe we have someother stuff left in the stack, which i havent accounted for.
+
+        Small Sample of working parameters layout in GDB
+
+        <video width="640" height="360" controls>
+            <source src="/records/with-proper-parameters.mov" type="video/quicktime">
+            <p>Your browser does not support the video tag. 
+               <a href="/records/with-proper-parameters.mov">Download the video</a>.</p>
+          </video>
+          
+          HELPFULL GDB commands:
+
+          b function name -> to break at the start of a function, tab completion works here
+          ni -> next instruction
+          disassable function name -> to get the instructions
+          c -> continue
+          info r -> show current registers
+
+          I am able using GEF gdb plugin to make the output little better in every break point
+
+
+          </div>
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
