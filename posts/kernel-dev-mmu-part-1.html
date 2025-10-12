@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MMU - Part 1</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">MMU - Part 1</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Oct 12, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">why do we need a MMU?...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-simple-scheduler.html">previous blog</a> we wrote a simple Scheduler that switched between two user processes, but both processes used the same address space, ie the physcial address space. it is like giving access to the entire storage account of a Bank to every user and excepting the user to only use his/her share in the account. maybe in an ideal world that would work, but in our world, lots of people are gonna try to use what is not allocated for them. so we need to isolate processs from accessing the physical address space, real reasons for why we would wanna add an extra layer of performance degradation are relative and out of topic, we dont wanna get philosopihal here and just say for privacy reasons, we want the isolation.
+
+            okay, we want users to use the same address space, with restrictions like "only access what they own"
+
+            this is why, we need an interface, it should be able to keep track of memory addresses.
+
+            eg: if process 1 wants to access 0x00ff address, this interface keep as note of it like
+
+            Process 1
+            0x00ff -> 0x0001
+
+            0x00ff is the virtual address that the process see and use, but physically it will be stored in 0x0001 and the process will have no idea about where it is
+
+            this way process 1 can only access something if it has entry in the interface table
+
+            if the process 1 wants new memory, it has to use syscall to ask kernel to create new interface table entries.
+
+            now we have mental image of a virtual address space that is allocated for an user, if there is a mapping in the table, then we can use that address, so this is everything that runs in el0
+
+            also what i mentioned as interface table is called as Page table in real world.
+
+            what i referened to as "The interface" is the actuall physical MMU unit, this will take a Virutal address and a Page Table, if the VA has translation in the table, it will return it.
+
+            Naturally, when i read about all of this Page tables, i had a question of where is this "Page table entries stored"?
+
+            truns out, it is stored within kernel address space, and every process will have a special register (TTBR0_EL1) that will have the base address to this table.
+
+            this address can only be modified from within the EL1, so users cant update this to some other user's table.
+
+            what about the kernel, or everything runs in el1? do they have any restrictions?
+
+            yes, kernel also has virtual address space, but unlike user space, this address range will always have a page table entry.
+
+            what is the usage of restricting kernel from directly access physical memory?
+
+            in normal case, if there is only a single kernel running, there is no real use of doing VA -> Phy translation within el1 context, but in real world server, we have hypervisors running on el2, that switch between two or more kernel, so in that context, even kernel shouldnt have raw access to the physical address range.
+
+
+            Let's start to build on our exising kernel that can just do scheduling.
+
+            - need to enable the MMU unit
+            - write a syscall that can allocate memory from user space.
+            - init stack region for user in va (previously we had a static char buffer, and we pointed sp to top of it)
+            - we need to store and update the page table base register for users, during context switch, update all old entries to be VA compitable
+            
+            we will see the code in part-2
+          
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
