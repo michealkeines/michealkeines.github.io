@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 2</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 2</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Oct 18, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's Setup and Enable MMU to jump into the kerenl...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-1.html">previous blog</a> we started of with why we need a MMU and how it works, we got the picture of the seperation between two processes achieved through having a table with virtual to physical address translation.
+
+            MMU requires Tables to convert virtual to physical address
+
+            we have two cases, user level table, kernel level table
+
+            MMU excepts these table's base address to be in a special registers
+
+            TTBR0_EL1 - User Table
+            TTBR1_EL1 - Kernel Table
+
+            we need to initialize these table base addresses.
+
+<pre><code>
+            ldr     x0, =user_table_base
+            ldr     x0, [x0]
+            msr     TTBR0_EL1, x0
+        
+            ldr     x0, =kernel_table_base
+            ldr     x0, [x0]
+            msr     TTBR1_EL1, x0
+</code></pre>
+
+            FUN FACT: at this point, i had a stupid doubt, because, we just enabled MMU, will MMU read this address in these special register as virtual or physical, if it does take it as virtual, then we will have chicken or egg problem, where mmu has to translate an address that points to the table which has the translations, sad, however, MMU considers the address in this special registers to be pointing to physical address, so we are good.
+
+            From user processes POV, if two of them were running, when we switch between them, we also have to update the Table base address (TTBR0_EL1) accordingly.
+            
+            Security Fact: if we can write to this register using some kernel expoit, we can effectivly get into another processes's Virtual space.
+
+            now we have to tell the MMU about our address layout, the seperation between User Space and Kernel Space, total physical space.
+
+            this is important, because user's process will use a Virtual address range that doesn't overlap with the kernel address
+
+            EG: all kernel address will start with 0xffff and all user address will start with 0x0000
+
+            so if user process try to reach 0xffff, MMU can directly throw a fault instead of looking into its table
+
+            this is set in the register TCR_EL1, this register is separated into multiple parts, we only care about three of them, 
+
+            T0SZ [5:0] = hold the size of user space
+            T1SZ [21:16] = hold the size of kernel space
+            IPS [34:32] = total size of the physical space
+
+            Eg: Linux uses 42 bit physical space, ie 4TB, i have use 40 bit, 1TB
+
+            64 - 16 = 48 bits, virtual space, ie 128 TB for both user and kernel
+
+<code><pre>
+Bit:   [63........35] [34:32] [31:22] [21:16] [15:6] [5:0]
+Value:     0            010       0      10000    0    10000
+Meaning:   —          IPS=40b    —     T1SZ=16   —   T0SZ=16
+
+ldr     x0, =((16) | (16 << 16) | (2 << 32))
+msr     TCR_EL1, x0
+isb
+</code></pre>
+
+        let's finally enable the MMU, as we have set all need registers,
+
+            SCTLR_EL1 register's bit 0 is the MMU unit
+
+        <code><pre>
+            MRS x0, SCTLR_EL1
+            ORR x0, x0, #(1 << 0)   // Enable MMU only
+            MSR SCTLR_EL1, x0
+            ISB
+        </code></pre>
+
+            now the MMU is ready, we can jump into kernel main.
+
+
+          
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
