@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 3</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 3</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Oct 26, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see the Table Layout and Debugging...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-2.html">previous blog</a> we setup the registers for the MMU to separate the kernel and user address space.
+
+            I added the registers setup and ran this, i got a fault, we have enabled MMU, and we jumping to a address, but that address doesnt have an entry in the kernel page table, this is bad
+
+            remember when i talked about tables initially, i mentioned that kernel address should always have an entry in the table, and we didnt do this in our setup
+
+            to fix this, before enabling MMU, we have to fill the kernel table alone with everything from kernel Virtual range, so there wont be any faults
+
+            i had to debug this in GDB for a while to understand what i missed here
+
+            <code>
+              [!] Cannot disassemble from $PC
+              [!] Cannot access memory at address 0x4000005c
+              ─────────────────────────────────────────────────────────────────── threads ────
+              [#0] Id 1, stopped 0x4000005c in _start (), reason: SINGLE STEP
+              ───────────────────────────────────────────────────────────────────── trace ────
+              [#0] 0x4000005c → _start()
+            </code>
+
+            now, lets think about how to add those entires, i was thinking like, i need go through all entries in loop and set some bit in them, turns out, the table is separated into different block, each block has capcity, if we can enable its highest lbock, everything inside will be valid
+            <code class="">
+              Level 1 (512 entries)
+              ├─ Entry 0 → empty (unmapped)
+              ├─ Entry 1 → block (1 GB mapped)
+              ├─ Entry 2 → pointer to next level
+              │     └─ Level 2 (512 entries)
+              │          ├─ each maps 2 MB
+              │          └─ can point further to L3 (512 × 4 KB)
+              └─ others → empty
+
+            </code>
+            why do we need this, think about it, incase, if we keep 4k page entry for our full virtual space let's say 1TB
+
+            even for 1TB virutal space  with 4kb page size, our page table alone will take 250GP page in our RAM
+
+            to avoid this, we separate the page into bigger block and only store them when needed
+
+            so even tho our kernel virtual space is 1TB, we are only gonna map 1GP of Virutal space in our page tables, that should be enough.
+
+
+            but getting this setup for the tables was really painfull, i was initially trying it in assembly directly, but i couldnt get it working.
+
+            It was really hard to debug this, because the entire table walk is done my MMU and it is a single step, so we will only have address translation fault, we have literally no information about which part of the table is missing or what information for the translation is needed to work correctly
+
+            so i am gonna try to explain the full table entry layout to make it as easy as possible
+
+            we have on base address for our table, lets take that as 0x80002000 (base address is what we write into TTBR0_EL1 or TTBR1_EL1)
+
+            a table entry can have three possible values
+
+            * Invalid (0) — not used.
+
+            * Block descriptor — directly maps a large region (e.g., 1GB or 2MB).
+
+            * Table descriptor — points to another table
+
+            every index within this table will be a entry pointing to range, which will be of the size defined in the TCR_EL1
+
+            if we set it to 4kb, then every entry in this table can hold 1GP of virtual space
+
+            Entry 0 covers 0x0000_0000 – 0x3FFF_FFFF
+
+            Entry 1 covers 0x4000_0000 – 0x7FFF_FFFF
+
+            Entry 2 covers 0x8000_0000 – 0xBFFF_FFFF
+
+            let say we want make a direct mapping for 0x8000_0000 – 0xBFFF_FFFF, then we write to that index 2
+
+            the entry should have the physical base address that we need it point to
+
+            ((uint64_t*)0x80002000)[2] = 0x80000000UL | 0b01; // Physical base address + block descriptor bit (01)
+
+            i.e, if we have a virtual address 0x8000_0000 it will be translated into physical 0x8000_0000
+
+            if we want to point to another table for 0x8000_0000 – 0xBFFF_FFFF, then we write to the index 2 base address of the table
+
+            ((uint64_t*)0x80002000)[2] = 0x80003000UL | 0b11; // Table base address + Table descriptor bit (11)
+
+            this is the hardpart to get right rest is just updating registers with proper base addresses which i have mentioned in previous blog.
+
+
+            now we are ready to enable MMU and it should all work.
+
+
+            Additional Debugging needed for next week, which you guys can try out
+
+            - i was not able to load the kernel into higher kernel address space, so currently i have loaded the kernel into user space range, that is why i have used user space table entries.
+
+            - i also faced an issue where when i tried to load the kernel in to 0x4000000, DTB was loaded in that space spot, so i have used 0x8000000
+
+            - use -d all -D qemu-%d.log qemu flags to get full logs on what is going on
+
+            full code in in here https://github.com/michealkeines/kernel_fuzzing/tree/main/kernel-simple-mmu
+          
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
