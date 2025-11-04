@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 4</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 4</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Nov 04, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see more Debugging...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-3.html">previous blog</a> we went through the MMU table layout and the structure of the entries.
+          
+
+            I had a doubt when i reread my blog, like why is L1 equal to 1GP? atleast that's how i have phrased it in my blog
+
+            Today, let's try to understand the VA separation and how ranges are calculated for every index within the table.
+
+            so when we define the layout in TCR_EL1, we specify the separation of VA, which was 48 bits + page size that is 4k in my example
+
+            T0SZ, T1SZ are parts of the TCR_EL1, that takes the VA size
+
+            TG0, TG1 are parts of the TCR_EL1, that takes the page size
+
+            <code>
+            For 4kb, we have predefined Levels
+
+            VA bits [47:39] - 512GP range
+            VA bits [38:30] - 1GP range
+            VA bits [29:21] - 2mb range
+            VA bits [20:12] - 4k range
+            VA bits [11:0]  - actual index
+
+            for 16kb, we have 
+
+            VA bit [47]     - 128TB range
+            VA bits [46:36] - 64GP range
+            VA bits [35:25] - 32MB range
+            VA bits [24:14] - 16kb range
+            VA bits [13:0] - actual index
+            </code>
+
+            if we take T0SZ as 16
+
+            then 64 - 16 = 48-bit address space
+
+            for 48bits VA + 4k Page
+
+            we can use entire bit range to index into the table that is 0-47, so all the Level will be used for indexing
+
+            if we pick 34 as T0SZ
+
+            then 64 - 34 = 30
+
+            that is 30bits can be used to index, in that case with 4kb page, our indexing will start from Level 2
+
+            Now let's say we want to map VA 0x80000000 to PA 0x90000000
+
+            what do we do?
+
+            need to know the VA size + page size
+
+            let's take that as 48 VA, 4kb page
+
+            For 4 KB, everything excep the last 11:0 bit should be indexed, and every level will have 11bits for indexing
+
+            and because we have selected 48-bit VA, MMU will start the walk from L0
+
+            we need to have index values in L0-L3
+            <code>
+            input VA is 0x80000000
+
+            0x0000000080000000
+
+            we should index 0-47 bits into the table
+
+            to index into L0 table, we want bits 47-39
+
+            0x80000000 >> 39  (bits [47:39])
+
+            to index into L1 table, we want bits 38-30
+
+            0x80000000 >> 30 (bits [38:30])
+
+            to index into L2 table, we want bits 29-21
+            0x80000000 >> 21  (bits [29:21])
+
+            to index into L3 table, we want bits 20-12
+
+            0x80000000 >> 12  (bits [20:12])
+        </code>
+            we just use shifts or AND operation to get the correct value in that bit range and use that as the index in that table.
+
+            one of the L should have a block descriptor or we will reach the final page entry
+
+            <code>
+            For 16 KB granule (offset = 14 bits instead of 12):
+
+            L0: >> 47  (bits [47])
+            L1: >> 36  (bits [46:36])
+            L2: >> 25  (bits [35:25])
+            L3: >> 14  (bits [24:14])
+        </code>
+            Incase if you get a translation fault, check the qemu logs for 
+
+            <code>cat qemu-1.log | grep -2 'with ESR' | head
+                Taking exception 3 [Prefetch Abort] on CPU 0
+                ...from EL1 to EL1
+                ...with ESR 0x21/0x86000005
+                ...with FAR 0x80000880
+                ...with SPSR 0x200003c5
+                --
+                Taking exception 3 [Prefetch Abort] on CPU 0
+                ...from EL1 to EL1
+                ...with ESR 0x21/0x86000005
+                ...with FAR 0x80001200</code>
+
+            In this error, we have tried to access address 0x80000880
+            
+            Fault code is 0x86000005
+
+            you can interrept the result using ARM manul, here is quick summary of different usefull codes
+
+            we got 0x5 L1 translation fault
+
+            0x0	Address size fault, level 0	L0
+            0x1	Address size fault, level 1	L1
+            0x2	Address size fault, level 2	L2
+            0x3	Address size fault, level 3	L3
+            0x4	Translation fault, level 0	L0
+            0x5	Translation fault, level 1	L1
+            0x6	Translation fault, level 2	L2
+            0x7	Translation fault, level 3	L3
+            0x9	Access flag fault, level 1	L1
+            0xD	Permission fault, level 1	L1
+        
+
+            https://github.com/michealkeines/kernel_fuzzing/blob/main/kernel-simple-mmu/core/mmu.c
+
+            I have implemented 48-bit 4kb and 16kb version
+
+            4kb version worked perfectly, 16kb didnt work no matter what i did, i was completly feed because, it felt like i gave everything correctly, when i was debugging it i found out that i get L1 translation error, i filled every index in L1 with the block and then it worked, i narrowed it down to the correct index, which was 2, which what we use in 4kb page, then i kept debugging whether my TCR register correct, may be i missed the bit there,nothing, everythign looked perfect, yet mmu just used 4k page index
+
+            i completly gave up and was google this, found some mailing where it say 16kb page is not supported in arm qemu cpus, idk if this true, but it looks like that.
+
+        References:
+
+        <a href="https://developer.arm.com/documentation/101811/0105/Translation-granule">Translation-granule (ARM Developer)</a><br>
+        <a href="https://lowenware.com/blog/aarch64-mmu-programming/">AArch64 MMU Programming (Lowenware Blog)</a><br>
+        <a href="https://developer.arm.com/documentation/101811/0105/Translation-granule/The-starting-level-of-address-translation">The Starting Level of Address Translation (ARM Developer)</a><br>
+        <a href="https://i-blog.csdnimg.cn/blog_migrate/a58c314f9fd133a97915d8fb4613faa0.png">Image – address translation diagram (CSDN)</a><br>
+        <a href="https://developer.arm.com/documentation/101550/0001/AArch64-registers/AArch64-register-descriptions/AArch64-Generic-System-control-register-description/ESR-EL1--Exception-Syndrome-Register--EL1-">ESR-EL1: Exception Syndrome Register (ARM Developer)</a>
+
+            
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
