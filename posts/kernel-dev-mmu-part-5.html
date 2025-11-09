@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 5</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 5</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Nov 09, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see how to jump from PA to VA...</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-4.html">previous blog</a> we went through more table layout and the structure debugging, now that it is over, we can finally enable the MMU properly and jump into Virtul Address range.
+          
+
+            the flow seemed straight forward when i initial thought about it
+
+          <code class="">
+
+            Kernel Gets loadded into 0x80000000 (my example)
+                              |
+            we want our kernel to use 0xffff000080000000 VA
+                              |
+            we add pages for 0xffff000080000000 -> 0x0000000080000000
+                              |
+                          enable MMU
+                              |
+            we jump into VA adddress range and execute from there
+          </code>
+
+          that should be good, i tired this, but there is one problem, the moment we enable MMU, that next instruction that needs to executed will throw a translation fault
+
+          <code class="">
+              0x80000920 <mmu_init+020c>  orr    x0,  x0,  #0x1
+              0x80000924 <mmu_init+0210>  orr    x0,  x0,  #0x4
+              0x80000928 <mmu_init+0214>  orr    x0,  x0,  #0x1000
+           ●→ 0x8000092c <mmu_init+0218>  msr    sctlr_el1,  x0
+              0x80000930 <mmu_init+021c>  dsb    sy
+              0x80000934 <mmu_init+0220>  isb
+              0x80000938 <mmu_init+0224>  ldp    x29,  x30,  [sp,  #128]
+              0x8000093c <mmu_init+0228>  add    sp,  sp,  #0x90
+              0x80000940 <mmu_init+022c>  ret
+           ──────────────────────────────────────────────────────────────────────────── threads ────
+           [#0] Id 1, stopped 0x8000092c in mmu_init (), reason: BREAKPOINT
+           ────────────────────────────────────────────────────────────────────────────── trace ────
+           [#0] 0x8000092c → mmu_init()
+           [#1] 0x80000034 → _start()
+           ─────────────────────────────────────────────────────────────────────────────────────────
+           (remote) gef➤
+          </code>
+            
+
+          Look at this break point, since my kernel is loaded into 0x8000000, all the instructions will exist in that range
+
+          enabling mmu instruction is on 0x8000092c
+
+          the moment we execute this instruction, mmu will be enabled and the next address 0x80000930 will throw a translation fault
+
+          as you know, we only have page table entry for 0xffff000080000000
+
+          we dont have any entry for 0x80000000
+
+          how can we get over this, i was looking into how linux tackles this scenario.
+
+          Linux just creates an identity map for 0x80000000 -> 0x80000000
+
+          this way the next instruction will be still be reachable and then we can add the extra code to jump into the VA instruction
+
+          <a href="https://git.gitlab.arm.com/arm-reference-solutions/linux/-/commit/8903826d0cd99aed9267e792d38284cf3092042b" class="">this old commit message confirms that identity map is created during MMU initialization</a>
+
+          so now we will have two page table entries, one for the VA and one for the identiy map
+
+          how do we find the correct address to jump into?
+
+          <code class="">
+            bl mmu_init
+
+            ldr x0, =0xFFFF000080000000
+            ldr x1, =0x0000000080000000
+            sub x2, x0, x1
+        
+            adrp x3, virt_entry
+            add  x3, x3, :lo12:virt_entry
+        
+            add x3, x3, x2
+        
+            br x3
+        
+        virt_entry:
+            bl  kmain
+            b   .
+          </code>
+
+          we can calculate that, we know the VA base address, we know the PA base address, subtract them to get the Base offset
+
+          for the last 12bits, which will be the acutal instruction with the offset, we can use labbel and get its last 12bits
+
+          joining base offset + index offset should give the correct address that we need to jump into.
+
+          all good, and it work perfectly.
+
+
+          Security Note:
+
+          since we just create the idenity map, if we dont clear that after we jumped into the VA, it would be as security issue, as we are leaving access to reach the physical address directly, we need to make sure we clear that entry right after we jump into the VA.
+
+
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
