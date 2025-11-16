@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 6</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 6</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Nov 16, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see how to parse DTB</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-5.html">previous blog</a> we finished of with jumping into the VA.
+          
+            now we need create an helper function that can allocate new pages for us, ie lets say user space or kernel method was extra space, we need to add need entries in the page table and return  the address
+
+            we only have limited physical ram, and every user process or kernel process might wanna try and allocate new memory.
+
+            we need a data structure that will keep track of the pages in PA that are currently in use, so we need allocate new pages for the new comers.
+
+            to start that, we need to know the total physical memory that is current available, this information is present in the DTB region in qemu setup at memory 0x40000000
+
+            we need to parse this DTB and get the total memory.
+
+            i have streamed the debugging session where i go about how we can parse the DTB and get the total memory size.
+
+            <iframe 
+                width="560" 
+                height="315" 
+                src="https://youtube.com/live/TOrb0IJutIQ?feature=share"
+                allowfullscreen>
+            </iframe>
+
+
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
