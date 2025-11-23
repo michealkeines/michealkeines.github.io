@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 7</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 7</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Nov 23, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">5 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see think about how we can implement a early memory helper..</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-6.html">previous blog</a> we parsed the DTB to find the actual total physical RAM.
+
+            now we have to pass the parsed value from the dtb parsing helper to kmain, Initially i tried to call this helper after jumping into kmain, then i ran to Page fault for the DTB memory location, instead of add the page table entry for that location, which would have be the easier solution.
+
+            I tried to write it to a Location that is already mapped and hoped that location is never writtn before we reach the kmain, but for some reason the address got overwritten, then instead of fix that, i tried to put on the stack, this also didnt work, as we have MMU init, which is ducking with the stack, so finally i found a register that seemed untouched and i have used that and it worked perfectly, this is still a hack, in future if i add something here, i need to be sure that, i wont write anything to r13 register ie, after the get_ram call and before kmain call.
+
+
+            then i got into rabbit hole beleiving that value is read correctly in the kmain, and was trying to debug that for a long time, then i finally realized that the value is read correctly.
+
+            the actual issue was disguised by two things,
+
+            - my uart_printf doesnt support print u64 values
+            - i have assigned a block of memory in linker script from my bitmap array, but i inited it in my C with extern like
+
+            "extern uint8_t *__block_memory_start"
+
+            i was thinking like, if i can take the starting address, i do the indexing maually with pointer arthimtic, but turns out, with extern, it will take try to take an pointer value from the block, so it will always return 0
+
+            "extern uint8_t __block_memory_start[]" 
+
+            just by declaring it as an array, i was able to fix it
+          
+            
+            i have streamed the debugging session where i go through the mental breakdown below think about these two bugs.
+
+            <iframe 
+                width="560" 
+                height="315" 
+                src="https://www.youtube.com/live/1schTTPSfl8?si=q447pyybdvJ6B0L9"
+                allowfullscreen>
+            </iframe>
+
+
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
