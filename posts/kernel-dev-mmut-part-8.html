@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 8</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 8</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Nov 30, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">10 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see think about how we can implement a low level page allocator..</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-7.html">previous blog</a> we have debugged some issues related to linker script to get the location for array map. 
+
+            In this part, I have implemented a low level page allocator/deallocator that is gonna keep track of the physical pages using a bitmap.
+
+            Initially, i had an idea of keeping track of the pages based on an index like
+
+            Struct {
+                map,
+                index,
+                bit
+            };
+
+            and keep incrementing the index to find the next free page, A page is set as used by setting it to 1, but this wont work if we have to free page, as we cant go back the index and find the freed page.
+
+            Second approach is to go through the map linearly and find the next free bit inside an index.
+
+            Struct {
+              map
+            }
+
+            we used bit shit operations to set/unset the bit inside an index.
+
+            Index: 0, Bit: 0
+            Index: 0, Bit: 1
+            Index: 0, Bit: 2
+            Index: 0, Bit: 3
+            Index: 0, Bit: 4
+            Index: 0, Bit: 5
+            Index: 0, Bit: 6
+            Index: 0, Bit: 7
+            Index: 1, Bit: 0
+            Index: 1, Bit: 1
+            Index: 1, Bit: 2
+            Index: 1, Bit: 3
+            Index: 1, Bit: 4
+            Index: 1, Bit: 5
+            
+            single index could store 8 pages.
+
+            I have steamed the entire implemenation session on youtube.
+            <iframe 
+                width="560" 
+                height="315" 
+                src="https://www.youtube.com/live/GiNLQQtIt0k?si=P21VJDS1spBXVqKc"
+                allowfullscreen>
+            </iframe>
+
+
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
