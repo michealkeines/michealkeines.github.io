@@ -1,0 +1,81 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 9</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 9</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Dec 07, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">10 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's see think about how we can implement a kmalloc..</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-8.html">previous blog</a> we have debugged some issues related to linker script to get the location for array map. 
+            In this part, I have explained the flow from kmalloc to the actual physical page allocation.
+
+            we have the helper that can allocate new pages and keep track of them using a bitmap array, what we need now is high level helper that can use this allocator internally
+            
+            - Allocate new pages based on the input size
+            - Create page table entries for the new pages
+            - return a pointer to the first page in this block
+            
+            Adding new page table entries is straight forward, as we already have the helpers that can find the index within the Table and mark it as block/table, I have also explained the table walk and value structure again to recall the basics .
+            
+            I have streamed the entire debugging session into two streams on YouTube.
+            
+            <iframe 
+                width="560" 
+                height="315" 
+                src="https://youtube.com/live/tPDfIA70nws"
+                allowfullscreen>
+            </iframe>
+
+
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
