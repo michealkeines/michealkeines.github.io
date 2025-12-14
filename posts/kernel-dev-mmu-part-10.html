@@ -1,0 +1,122 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>An Intro to Kernel Development - MMU - Part 10</title>
+
+    <!-- Optional metadata; fill these per post -->
+    <meta name="description" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml" />
+  </head>
+  <body>
+    <header>
+      
+    </header>
+
+    <main>
+      <article itemscope itemtype="https://schema.org/Article">
+        <header>
+          <h1 itemprop="headline">An Intro to Kernel Development - MMU - Part 10</h1>
+          <p>
+            <time itemprop="datePublished" datetime="">Dec 14, 2025</time>
+            <span aria-hidden="true"> · </span>
+            <span itemprop="timeRequired">10 mins</span>
+          </p>
+        </header>
+
+        <section id="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Let's debug the bugs in our kmalloc..</h2>
+          <div  style="white-space: pre-line;">
+            In the <a href="/posts/kernel-dev-mmu-part-9.html">previous blog</a> we have added the implementation for kmalloc.
+
+            In this part, I have debugged all the bugs in my kmalloc implementation to make it work seemlessly.
+
+
+            I have added all the new helpers for kmalloc and called it in my kmain, i got an error, that is not related to kmalloc, i have an "Kernel Inited" print message in top of my kmain, and that didn't get printed, so i knew i haven't reached my code, and my existing code just decided to stop working, only thing have changed i have added some new code, i uncomment all my new code, boom, everything works, that's all had and from there i had to bash my head for hour to figure out that because my .text section was not aligned, and as i have added new code, it was overflowing that section to overwrite stuff, which messed by the entire structure.
+
+            Bug:
+
+            <code class="">
+              .text : { *(.text*); }
+              .rodata : { *(.rodata*) }
+            </code>
+            
+            Fixed:
+
+            <code class="">
+              .text : { *(.text*); }
+              . = ALIGN(4096);
+             .rodata : { *(.rodata*) }
+            </code>
+
+            I have Learned that because my setup fully written by me, i have to make sure i add things that fexible, if not i will be debugging random errors like this in future.
+            
+            I have streamed the entire debugging session on YouTube.
+            
+            <iframe 
+                width="560" 
+                height="315" 
+                src="https://www.youtube.com/live/MQeQRJ2alMI?si=BIZile2Cce4f-012"
+                allowfullscreen>
+            </iframe>
+
+
+            You just wrote a value into the memory, instruction didnt throw any faults, but you dont see the value in the memory, what do you think is going wrong here?
+
+            This is what i had me stuck for 3 hours, i ripped by MMU code into peices add fixed all of stuff, still i couldn't fix the bug.
+
+            - VA => PA page table entry exist
+            - 0xffff01f40000 = 0x000001f40000 (i confirmed this manually in gdb, that it exist)
+            - Write instruction works fine
+            - I dont have an cache enabled in my setup
+
+            I had lot of minor bugs that i fixed as i read my code again and again, but nothing solved the core issue.
+
+            I was hopeless looking in qemu logs, that when i saw a error message "pflash_write: Unimplemented flash cmd sequence (offset 0000000002ee0000, wcycle 0x0 cmd 0x0 value 0x66)"
+
+            so i was starting my physical pages from 0x000000000000, but qemu maps ram from the location we give in command-line, which is 0x80000000 in my case. so i was never writing into RAM
+
+            I fixed it by make my pages tables start from within 0x80000000, boom, everything worked.
+
+
+            well, atleast i am happy i figured this finally after lot of bashing, you can watch then entire session on youtube.
+
+
+            <iframe 
+            width="560" 
+            height="315" 
+            src="https://www.youtube.com/live/p0Z0nWwOSOA?si=yGl5Ib73wewlo7ax"
+            allowfullscreen>
+        </iframe> 
+
+        </section>
+
+        <footer>
+          <hr />
+          <!-- Post navigation (fill if applicable) -->
+          <nav aria-label="Post">
+            <a rel="prev" href=""><!-- ← Previous post title --></a>
+            <span> · </span>
+            <a rel="next" href=""><!-- Next post title → --></a>
+          </nav>
+
+          <!-- Optional: author box -->
+          <section id="author" itemprop="author" itemscope itemtype="https://schema.org/Person">
+            <h2>About the author</h2>
+            <p><span itemprop="name">micheal keines</span> — security engineer interested in low‑level networking, scheduling, and memory management in the kernel.</p>
+          </section>
+        </footer>
+      </article>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year">2025</span> 
+      <a href="/" aria-label="Home">micheal keines</a></p>
+      <hr />
+    </footer>
+
+  </body>
+</html>
