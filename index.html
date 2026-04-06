@@ -29,7 +29,9 @@
           where path traversals and file overwrites hide in plain sight. i also spend a lot of time
           in kernel land, writing a small ARM kernel from scratch just to understand how things
           actually work at the lowest level. memory management, page tables, schedulers — the stuff
-          that makes everything else possible.
+          that makes everything else possible. i <a href="https://www.youtube.com/@michealkeines">stream</a>
+          the whole kernel dev process live on YouTube — it's become a big part of how i learn and
+          share what i'm working on.
         </p>
         <p>
           before all this, i was a penetration tester doing white-box and grey-box assessments,
@@ -39,9 +41,29 @@
         </p>
         <ul>
           <li><a rel="me" href="https://github.com/michealkeines/">GitHub</a></li>
+          <li><a rel="me" href="https://www.youtube.com/@michealkeines">YouTube</a></li>
           <li><a rel="me" href="https://www.linkedin.com/in/michealkeines/">LinkedIn</a></li>
           <li><a rel="me" href="https://x.com/michealkeines/">X/Twitter</a></li>
         </ul>
+      </section>
+
+      <hr>
+
+      <!-- Streaming -->
+      <section id="streaming" aria-labelledby="streaming-title">
+        <h2 id="streaming-title">Streaming</h2>
+        <p>
+          i stream the entire kernel development process live on
+          <a href="https://www.youtube.com/@michealkeines">YouTube</a>.
+          building an ARM kernel from scratch — MMU setup, page allocators, schedulers, debugging
+          sessions, all of it happening in real time. no edited highlights, just the actual process
+          of writing kernel code, hitting weird faults, staring at GDB output, and eventually
+          figuring it out.
+        </p>
+        <p>
+          if you're into low-level systems programming or just want to see what kernel development
+          actually looks like (spoiler: lots of debugging), come hang out.
+        </p>
       </section>
 
       <hr>
@@ -60,7 +82,7 @@
             found an arbitrary file overwrite in ONNX caused by improper path handling during
             model processing. an attacker could write files outside intended directories, which
             in an AI pipeline means potential code execution.
-            <a href="https://github.com/onnx/onnx/pull/">disclosure</a>
+            <a href="https://github.com/onnx/onnx/pull/7040">disclosure</a>
           </li>
           <li>
             <strong>Ollama — Directory Traversal</strong><br>
@@ -72,13 +94,13 @@
             <strong>Ollama — Information Disclosure</strong><br>
             info disclosure through improper validation of user-controlled input paths, exposing
             internal resources.
-            <a href="https://huntr.com/bounties/e228d9b1-fbea-4bcd-96fa-9681af2a">huntr</a>
+            <a href="https://huntr.com/bounties/e228d9b1-fbea-4bcd-96fa-9681af2a4995">huntr</a>
           </li>
           <li>
             <strong>lxml — Denial of Service</strong><br>
             crafted HTML input causing an unhandled exception during parsing. worked with
             maintainers on the fix.
-            <a href="https://bugs.launchpad.net/lxml/+bug/">launchpad</a>
+            <a href="https://bugs.launchpad.net/lxml/+bug/2044225">launchpad</a>
           </li>
         </ul>
         <p>
