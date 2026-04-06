@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>micheal keines</title>
-    <meta name="description" content="Personal blog">
+    <meta name="description" content="Senior Security Engineer — vulnerability research, kernel internals, security tooling">
     <link rel="alternate" type="application/rss+xml" title="RSS" href="/feed.xml">
   </head>
   <body>
@@ -12,12 +12,30 @@
     <main>
       <!-- About / Intro -->
       <section id="about" aria-labelledby="about-title">
-        <h2 id="about-title">About me</h2>
+        <h1 id="about-title">micheal keines</h1>
         <p>
-          I'm a security engineer focused on <strong>low‑level networking</strong>,
-          <strong>process/thread scheduling</strong>, and <strong>memory management</strong> at the
-          <strong>kernel</strong> level. This site hosts notes, deep dives, and
-          practical experiments around Linux internals and related subsystems.
+          Senior Security Engineer at <strong>Holm Security</strong>, Stockholm.
+        </p>
+        <p>
+          i build security products for a living — network scanners, web scanners, API scanners,
+          the kind of tools that poke at your infrastructure so attackers don't get there first.
+          i've spent the last few years designing scanning engines, writing exploitation modules,
+          and figuring out how to make browser-based scanning actually work against modern SPAs.
+          lately i've been integrating LLMs into security pipelines for smarter payload generation
+          and false-positive reduction, which is more interesting than it sounds.
+        </p>
+        <p>
+          outside of work, i do independent vulnerability research — mostly in open-source projects
+          where path traversals and file overwrites hide in plain sight. i also spend a lot of time
+          in kernel land, writing a small ARM kernel from scratch just to understand how things
+          actually work at the lowest level. memory management, page tables, schedulers — the stuff
+          that makes everything else possible.
+        </p>
+        <p>
+          before all this, i was a penetration tester doing white-box and grey-box assessments,
+          and before that i was learning how to overflow buffers and pass OSCP. the thread through
+          all of it is the same — i like breaking things to understand how they work, and then
+          building better things with that understanding.
         </p>
         <ul>
           <li><a rel="me" href="https://github.com/michealkeines/">GitHub</a></li>
@@ -28,191 +46,331 @@
 
       <hr>
 
-      <section id="posts" aria-labelledby="posts-title">
-        <h2 id="posts-title">Latest posts</h2>
+      <!-- Vulnerability Research -->
+      <section id="cves" aria-labelledby="cves-title">
+        <h2 id="cves-title">Vulnerability Research</h2>
+        <p>
+          i hunt for bugs in open-source projects — path traversals, file overwrites, info leaks,
+          the kind of things that slip through code review because nobody thinks about what happens
+          when a user-controlled path meets an unchecked write.
+        </p>
+        <ul>
+          <li>
+            <strong>CVE-2025-51480 — ONNX (Arbitrary File Overwrite)</strong><br>
+            found an arbitrary file overwrite in ONNX caused by improper path handling during
+            model processing. an attacker could write files outside intended directories, which
+            in an AI pipeline means potential code execution.
+            <a href="https://github.com/onnx/onnx/pull/">disclosure</a>
+          </li>
+          <li>
+            <strong>Ollama — Directory Traversal</strong><br>
+            directory traversal via insufficient path sanitization, allowing access to unintended
+            filesystem locations.
+            <a href="https://huntr.com/bounties/795fd494-a11a-4bd0-a277-8a967d0fed4c">huntr</a>
+          </li>
+          <li>
+            <strong>Ollama — Information Disclosure</strong><br>
+            info disclosure through improper validation of user-controlled input paths, exposing
+            internal resources.
+            <a href="https://huntr.com/bounties/e228d9b1-fbea-4bcd-96fa-9681af2a">huntr</a>
+          </li>
+          <li>
+            <strong>lxml — Denial of Service</strong><br>
+            crafted HTML input causing an unhandled exception during parsing. worked with
+            maintainers on the fix.
+            <a href="https://bugs.launchpad.net/lxml/+bug/">launchpad</a>
+          </li>
+        </ul>
+        <p>
+          ongoing research targets Linux kernel subsystems and Chromium/V8 internals — memory safety
+          bugs, filesystem boundary issues, and fuzzing-based discovery.
+        </p>
+      </section>
 
-        <!-- Example post item -->
+      <hr>
+
+      <!-- Certifications -->
+      <section id="certs" aria-labelledby="certs-title">
+        <h2 id="certs-title">Certifications</h2>
+        <ul>
+          <li><strong>OSCP</strong> — Offensive Security Certified Professional (Dec 2020)</li>
+          <li><strong>OSWE</strong> — Offensive Security Web Expert (Jul 2021)</li>
+          <li><strong>LFD103</strong> — Linux Kernel Development, Linux Foundation (Feb 2023)</li>
+        </ul>
+      </section>
+
+      <hr>
+
+      <!-- Projects -->
+      <section id="projects" aria-labelledby="projects-title">
+        <h2 id="projects-title">Projects</h2>
+        <p>
+          i learn by building. most of these are experiments, research tools, or things i built
+          to understand something better. some are useful, some are just me figuring things out.
+        </p>
+        <ul>
+          <li>
+            <a href="https://github.com/michealkeines/kernel_fuzzing"><strong>kernel_fuzzing</strong></a> —
+            ARM kernel built from scratch in C and assembly. custom MMU, page allocator, kmalloc,
+            scheduler. the kernel dev articles below document the entire journey.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/Proyx"><strong>Proyx</strong></a> —
+            scalable HTTP proxy in Rust. built for protocol-level security testing and
+            request/response instrumentation.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/V8-Research-Book"><strong>V8-Research-Book</strong></a> —
+            notes on V8 engine internals and vulnerability research. still actively digging into this.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/Vulnerable-API"><strong>Vulnerable-API</strong></a> —
+            intentionally vulnerable API with XSS, SQLi, SSTI, LFI, RFI, HHI — built for testing
+            security scanners against real-world attack vectors.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/Burpy"><strong>Burpy</strong></a> —
+            Burpsuite Professional tooling for web security testing workflows.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/Titan"><strong>Titan</strong></a> —
+            experimental OS kernel written in Rust.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/Rust"><strong>Rust</strong></a> —
+            my Rust learning repo — systems programming, concurrency, networking experiments.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/CVE-Information-Extractor"><strong>CVE-Information-Extractor</strong></a> —
+            python tool for extracting and filtering CVE data.
+          </li>
+          <li>
+            <a href="https://github.com/michealkeines/BinaryExploitation"><strong>BinaryExploitation</strong></a> —
+            RPISec lab solutions, automated with bash.
+          </li>
+        </ul>
+      </section>
+
+      <hr>
+
+      <!-- Skills -->
+      <section id="skills" aria-labelledby="skills-title">
+        <h2 id="skills-title">What I Work With</h2>
+        <ul>
+          <li><strong>Languages:</strong> Rust, C, C++, Python, Go, TypeScript, x86/ARM Assembly</li>
+          <li><strong>Kernel & Systems:</strong> MMU, IPC, scheduling, debugging, control flow analysis</li>
+          <li><strong>Security Testing:</strong> fuzzing, SAST, source-to-sink analysis, threat modeling</li>
+          <li><strong>Reverse Engineering:</strong> IDA, Ghidra, GDB, dynamic instrumentation</li>
+          <li><strong>Security Tools:</strong> OpenVAS, libpcap, Burpsuite</li>
+          <li><strong>Infrastructure:</strong> Docker, Kubernetes, GitLab CI/CD</li>
+          <li><strong>AI/ML Security:</strong> LLM integration, model fuzzing, secure AI pipelines</li>
+        </ul>
+      </section>
+
+      <hr>
+
+      <!-- Education -->
+      <section id="education" aria-labelledby="education-title">
+        <h2 id="education-title">Education</h2>
+        <ul>
+          <li><strong>M.Eng Electronic Systems</strong> — University of Liverpool (2023–2025)</li>
+          <li><strong>BS Computer Applications</strong> — University of Madras (2016–2019)</li>
+        </ul>
+      </section>
+
+      <hr>
+
+      <!-- Articles -->
+      <section id="posts" aria-labelledby="posts-title">
+        <h2 id="posts-title">Articles</h2>
+        <p>
+          i'm writing a series on building an ARM kernel from scratch. it's not polished tutorials —
+          it's the actual process, debugging sessions, wrong assumptions, and all.
+          if you want to understand how kernels work at the lowest level, this is the messy real version.
+        </p>
+
         <article>
           <h3>
-            <a href="/posts/kernel-dev.html">An Intro to kernel Dev</a>
+            <a href="/posts/kernel-dev.html">An Intro to Kernel Dev</a>
           </h3>
           <p>build and run kernel.</p>
           <p>
             <small>
-              <time datetime="2025-08-28">August 28, 2025</time> · 5 min read 
+              <time datetime="2025-08-28">August 28, 2025</time> · 5 min read
             </small>
           </p>
         </article>
 
         <article>
-            <h3>
-              <a href="/posts/kernel-dev-boot-loader.html">Bootloader</a>
-            </h3>
-            <p>understand what bootloader does.</p>
-            <p>
-              <small>
-                <time datetime="2025-08-28">Sep 03, 2025</time> · 5 min read 
-              </small>
-            </p>
-          </article>
+          <h3>
+            <a href="/posts/kernel-dev-boot-loader.html">Bootloader</a>
+          </h3>
+          <p>understand what bootloader does.</p>
+          <p>
+            <small>
+              <time datetime="2025-09-03">Sep 03, 2025</time> · 5 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-interrupts.html">Interrupts</a>
-            </h3>
-            <p>understand why do we need interrupts.</p>
-            <p>
-              <small>
-                <time datetime="2025-09-20">Sep 20, 2025</time> · 15 min read 
-              </small>
-            </p>
-          </article>
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-simple-scheduler.html">Simple Scheduler</a>
-            </h3>
-            <p>understanding how a Simple Scheduler works.</p>
-            <p>
-              <small>
-                <time datetime="2025-09-28">Sep 28, 2025</time> · 15 min read 
-              </small>
-            </p>
-          </article>
-          
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-debugging-session-1.html">Debugging Kernel - Part 1</a>
-            </h3>
-            <p>Debugging Tips & Common Issues</p>
-            <p>
-              <small>
-                <time datetime="2025-10-06">Oct 06, 2025</time> · 5 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-interrupts.html">Interrupts</a>
+          </h3>
+          <p>understand why do we need interrupts.</p>
+          <p>
+            <small>
+              <time datetime="2025-09-20">Sep 20, 2025</time> · 15 min read
+            </small>
+          </p>
+        </article>
 
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-simple-scheduler.html">Simple Scheduler</a>
+          </h3>
+          <p>understanding how a Simple Scheduler works.</p>
+          <p>
+            <small>
+              <time datetime="2025-09-28">Sep 28, 2025</time> · 15 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-1.html">MMU - Part 1</a>
-            </h3>
-            <p>why do we need a MMU?</p>
-            <p>
-              <small>
-                <time datetime="2025-10-12">Oct 12, 2025</time> · 5 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-debugging-session-1.html">Debugging Kernel - Part 1</a>
+          </h3>
+          <p>Debugging Tips & Common Issues</p>
+          <p>
+            <small>
+              <time datetime="2025-10-06">Oct 06, 2025</time> · 5 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-2.html">MMU - Part 2</a>
-            </h3>
-            <p>Setup and Enabling MMU Unit</p>
-            <p>
-              <small>
-                <time datetime="2025-10-18">Oct 18, 2025</time> · 5 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-1.html">MMU - Part 1</a>
+          </h3>
+          <p>why do we need a MMU?</p>
+          <p>
+            <small>
+              <time datetime="2025-10-12">Oct 12, 2025</time> · 5 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-3.html">MMU - Part 3</a>
-            </h3>
-            <p>Table Layout and Debugging MMU</p>
-            <p>
-              <small>
-                <time datetime="2025-10-18">Oct 26, 2025</time> · 15 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-2.html">MMU - Part 2</a>
+          </h3>
+          <p>Setup and Enabling MMU Unit</p>
+          <p>
+            <small>
+              <time datetime="2025-10-18">Oct 18, 2025</time> · 5 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-4.html">An Intro to Kernel Development - MMU - Part 4</a>
-            </h3>
-            <p>More Debugging MMU</p>
-            <p>
-              <small>
-                <time datetime="2025-10-18">Nov 4, 2025</time> · 15 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-3.html">MMU - Part 3</a>
+          </h3>
+          <p>Table Layout and Debugging MMU</p>
+          <p>
+            <small>
+              <time datetime="2025-10-26">Oct 26, 2025</time> · 15 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-5.html">An Intro to Kernel Development - MMU - Part 5</a>
-            </h3>
-            <p>PA to VA Jump</p>
-            <p>
-              <small>
-                <time datetime="2025-11-09">Nov 9, 2025</time> · 5 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-4.html">MMU - Part 4</a>
+          </h3>
+          <p>More Debugging MMU</p>
+          <p>
+            <small>
+              <time datetime="2025-11-04">Nov 4, 2025</time> · 15 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-6.html">An Intro to Kernel Development - MMU - Part 6</a>
-            </h3>
-            <p>DTB Parsing</p>
-            <p>
-              <small>
-                <time datetime="2025-11-09">Nov 16, 2025</time> · 10 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-5.html">MMU - Part 5</a>
+          </h3>
+          <p>PA to VA Jump</p>
+          <p>
+            <small>
+              <time datetime="2025-11-09">Nov 9, 2025</time> · 5 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-7.html">An Intro to Kernel Development - MMU - Part 7</a>
-            </h3>
-            <p>Linker Script Debugging</p>
-            <p>
-              <small>
-                <time datetime="2025-11-23">Nov 23, 2025</time> · 10 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-6.html">MMU - Part 6</a>
+          </h3>
+          <p>DTB Parsing</p>
+          <p>
+            <small>
+              <time datetime="2025-11-16">Nov 16, 2025</time> · 10 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-8.html">An Intro to Kernel Development - MMU - Part 8</a>
-            </h3>
-            <p>Low Level Page Allocator/DeAllocator Implementation.</p>
-            <p>
-              <small>
-                <time datetime="2025-11-30">Nov 30, 2025</time> · 10 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-7.html">MMU - Part 7</a>
+          </h3>
+          <p>Linker Script Debugging</p>
+          <p>
+            <small>
+              <time datetime="2025-11-23">Nov 23, 2025</time> · 10 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-9.html">An Intro to Kernel Development - MMU - Part 9</a>
-            </h3>
-            <p>Kmalloc Implementation</p>
-            <p>
-              <small>
-                <time datetime="2025-11-30">Dec 07, 2025</time> · 10 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-8.html">MMU - Part 8</a>
+          </h3>
+          <p>Low Level Page Allocator/DeAllocator Implementation.</p>
+          <p>
+            <small>
+              <time datetime="2025-11-30">Nov 30, 2025</time> · 10 min read
+            </small>
+          </p>
+        </article>
 
-          <article>
-            <h3>
-              <a href="/posts/kernel-dev-mmu-part-10.html">An Intro to Kernel Development - MMU - Part 10</a>
-            </h3>
-            <p>Kmalloc Debugging</p>
-            <p>
-              <small>
-                <time datetime="2025-11-30">Dec 14, 2025</time> · 10 min read 
-              </small>
-            </p>
-          </article>
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-9.html">MMU - Part 9</a>
+          </h3>
+          <p>Kmalloc Implementation</p>
+          <p>
+            <small>
+              <time datetime="2025-12-07">Dec 07, 2025</time> · 10 min read
+            </small>
+          </p>
+        </article>
+
+        <article>
+          <h3>
+            <a href="/posts/kernel-dev-mmu-part-10.html">MMU - Part 10</a>
+          </h3>
+          <p>Kmalloc Debugging</p>
+          <p>
+            <small>
+              <time datetime="2025-12-14">Dec 14, 2025</time> · 10 min read
+            </small>
+          </p>
+        </article>
+      </section>
     </main>
-    
+
     <hr>
 
     <footer>
@@ -220,5 +378,6 @@
       <p><a href="/feed.xml">RSS</a></p>
     </footer>
 
+    <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
   </body>
 </html>
