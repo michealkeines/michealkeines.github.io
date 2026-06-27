@@ -78,6 +78,17 @@
         </p>
         <ul>
           <li>
+            <strong>Chromium V8 — ContinuationPreservedEmbedderData Leak Through Throwing Microtasks</strong><br>
+            when a microtask throws an exception, V8's <code>RunSingleMicrotask</code> jumps directly to the
+            exception handler, bypassing the normal <code>ClearContinuationPreservedEmbedderData()</code> call.
+            the CPED from the throwing microtask's context bleeds into the exception's
+            <code>toString()</code> execution and all subsequent microtasks in the queue.
+            since CPED is the mechanism Node.js <code>AsyncLocalStorage.run()</code> uses to propagate
+            context, this silently breaks isolation guarantees — authentication scope, tenant identity,
+            or RBAC context stored in ALS can leak across microtask boundaries after any throwing microtask.
+            <a href="https://chromium-review.googlesource.com/c/v8/v8/+/7991719">review</a>
+          </li>
+          <li>
             <strong>CVE-2025-51480 — ONNX (Arbitrary File Overwrite)</strong><br>
             found an arbitrary file overwrite in ONNX caused by improper path handling during
             model processing. an attacker could write files outside intended directories, which
@@ -105,7 +116,7 @@
         </ul>
         <p>
           ongoing research targets Linux kernel subsystems and Chromium/V8 internals — memory safety
-          bugs, filesystem boundary issues, and fuzzing-based discovery.
+          bugs, context isolation issues, and fuzzing-based discovery.
         </p>
       </section>
 
